@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suhagan Sells Pro Admin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { --primary: #2563eb; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --bg: #f1f5f9; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        .card { width: 100%; max-width: 400px; background: white; border-radius: 15px; padding: 20px; box-shadow: 0 10px 15px rgba(0,0,0,0.1); margin-bottom: 20px; box-sizing: border-box; }
+        h1 { text-align: center; border: 2px solid #333; padding: 10px; margin: 0 0 20px 0; font-size: 22px; }
+        .field { margin-bottom: 12px; }
+        label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #334155; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        #newBrandInput { margin-top: 8px; display: none; border: 2px solid var(--primary); background: #f0f7ff; }
+        .btn-save { width: 100%; background: var(--primary); color: white; padding: 15px; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .filter-area { width: 100%; max-width: 400px; background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); box-sizing: border-box; }
+        .price-tag { background: #e2e8f0; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: bold; display: inline-block; min-width: 50px; text-align: center;}
+        .btn-edit { background: var(--warning); color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; float: right; font-size: 12px; margin-left: 5px; }
+        .btn-delete { background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; float: right; font-size: 12px; }
+        .item-card { background: #fff; padding: 12px; margin-bottom: 10px; border-radius: 10px; border-left: 5px solid var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>Suhagan Sells</h1>
+    <div class="field">
+        <label>Select Brand</label>
+        <select id="brandSelect" onchange="checkBrand(this.value)">
+            <option value="">-- Chune --</option>
+            <option value="Jio">Jio</option>
+            <option value="Samsung">Samsung</option>
+            <option value="Vivo">Vivo</option>
+            <option value="ADD_NEW">+ Add New Brand</option>
+        </select>
+        <input type="text" id="newBrandInput" placeholder="Naya Brand Name">
+    </div>
+    <div class="field"><label>Model</label><input type="text" id="modelName"></div>
+    <div style="display: flex; gap: 8px;">
+        <div class="field" style="flex:1"><label>RAM</label><input type="text" id="ram" placeholder="ex: 8GB"></div>
+        <div class="field" style="flex:1"><label>Storage</label><input type="text" id="storage" placeholder="ex: 128GB"></div>
+    </div>
+    <div class="field"><label>Price (₹)</label><input type="number" id="price"></div>
+    <div class="field"><label>Flipkart Link</label><input type="url" id="fLink"></div>
+    <button class="btn-save" id="saveBtn" onclick="saveProductData()">SAVE ALL DETAILS</button>
+</div>
+
+<!-- FILTER AREA WITH RAM & STORAGE FILTERS -->
+<div class="filter-area">
+    <label style="font-weight: bold; margin-bottom: 8px; display: block;">Inventory Filters:</label>
+    
+    <div class="field">
+        <input type="text" id="searchInput" placeholder="Search Brand / Model..." onkeyup="applyFilters()">
+    </div>
+    
+    <div style="display:flex; gap:8px; margin-bottom:10px;">
+        <input type="text" id="ramFilter" placeholder="RAM (e.g. 6, 8GB)" onkeyup="applyFilters()">
+        <input type="text" id="storageFilter" placeholder="Storage (e.g. 128, 256)" onkeyup="applyFilters()">
+    </div>
+
+    <div style="display:flex; gap:8px;">
+        <input type="number" id="minPrice" placeholder="Min ₹" onkeyup="applyFilters()">
+        <input type="number" id="maxPrice" placeholder="Max ₹" onkeyup="applyFilters()">
+    </div>
+</div>
+
+<div id="logArea" style="width:100%; max-width:400px;">
+    <h3 style="margin-bottom:10px;">Stock Inventory:</h3>
+    <div id="savedList"></div>
+</div>
+
+<script>
+    // Keys for LocalStorage
+    const STORAGE_KEY_PRODUCTS = 'suhagan_products';
+    const STORAGE_KEY_BRANDS = 'suhagan_custom_brands';
+
+    let allProducts = [];
+    let customBrands = [];
+    let editId = null;
+
+    // Load Initial Data on Page Load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadBrands();
+        loadProducts();
+    });
+
+    // LOAD BRANDS FROM LOCAL STORAGE
+    function loadBrands() {
+        const savedBrands = localStorage.getItem(STORAGE_KEY_BRANDS);
+        customBrands = savedBrands ? JSON.parse(savedBrands) : [];
+        
+        const select = document.getElementById('brandSelect');
+        customBrands.forEach(b => {
+            let exists = Array.from(select.options).some(opt => opt.value === b);
+            if(!exists) {
+                let opt = document.createElement('option');
+                opt.value = b; 
+                opt.text = b;
+                select.add(opt, select.options.length - 1);
+            }
+        });
+    }
+
+    // LOAD PRODUCTS FROM LOCAL STORAGE
+    function loadProducts() {
+        const savedProducts = localStorage.getItem(STORAGE_KEY_PRODUCTS);
+        allProducts = savedProducts ? JSON.parse(savedProducts) : [];
+        updateList(allProducts);
+    }
+
+    // SAVE & UPDATE PRODUCT
+    function saveProductData() {
+        const brandSel = document.getElementById('brandSelect').value;
+        const newBrand = document.getElementById('newBrandInput').value.trim();
+        const finalBrand = (brandSel === 'ADD_NEW') ? newBrand : brandSel;
+        
+        const model = document.getElementById('modelName').value.trim();
+        const ram = document.getElementById('ram').value.trim();
+        const storage = document.getElementById('storage').value.trim();
+        const price = parseInt(document.getElementById('price').value);
+        const link = document.getElementById('fLink').value.trim();
+
+        if(finalBrand && model && !isNaN(price)) {
+            // Save custom brand if new
+            if(brandSel === 'ADD_NEW' && newBrand && !customBrands.includes(newBrand)) {
+                customBrands.push(newBrand);
+                localStorage.setItem(STORAGE_KEY_BRANDS, JSON.stringify(customBrands));
+                
+                // Add to dropdown dynamically
+                const select = document.getElementById('brandSelect');
+                let opt = document.createElement('option');
+                opt.value = newBrand;
+                opt.text = newBrand;
+                select.add(opt, select.options.length - 1);
+            }
+
+            if(editId) {
+                // Update Existing Product
+                const index = allProducts.findIndex(p => p.id === editId);
+                if(index !== -1) {
+                    allProducts[index] = { id: editId, brand: finalBrand, model, ram, storage, price, link };
+                    alert("Update Ho Gaya!");
+                }
+                editId = null;
+                document.getElementById('saveBtn').innerText = "SAVE ALL DETAILS";
+            } else {
+                // Create New Product
+                const newProduct = {
+                    id: 'prod_' + Date.now(),
+                    brand: finalBrand,
+                    model: model,
+                    ram: ram,
+                    storage: storage,
+                    price: price,
+                    link: link
+                };
+                allProducts.push(newProduct);
+                alert("Local Storage mein save ho gaya!");
+            }
+
+            // Save array to LocalStorage
+            localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(allProducts));
+            
+            // UI Reset
+            resetForm();
+            applyFilters();
+        } else {
+            alert("Kripya saare zaroori fields (Brand, Model, Price) bharein!");
+        }
+    }
+
+    // RESET FORM
+    function resetForm() {
+        document.getElementById('brandSelect').value = "";
+        document.getElementById('newBrandInput').value = "";
+        document.getElementById('newBrandInput').style.display = 'none';
+        document.getElementById('modelName').value = "";
+        document.getElementById('ram').value = "";
+        document.getElementById('storage').value = "";
+        document.getElementById('price').value = "";
+        document.getElementById('fLink').value = "";
+        editId = null;
+        document.getElementById('saveBtn').innerText = "SAVE ALL DETAILS";
+    }
+
+    // UPDATE LIST UI
+    function updateList(data) {
+        const list = document.getElementById('savedList');
+        list.innerHTML = "";
+        
+        if (data.length === 0) {
+            list.innerHTML = `<p style="text-align:center; color:#64748b; font-size:14px;">Koi item nahi mila.</p>`;
+            return;
+        }
+
+        // Display newest first
+        [...data].reverse().forEach(p => {
+            const item = document.createElement('div');
+            item.className = 'item-card';
+            item.innerHTML = `
+                <button class="btn-delete" onclick="deleteItem('${p.id}')">Delete</button>
+                <button class="btn-edit" onclick="editItem('${p.id}')">Edit</button>
+                <strong>${p.brand} ${p.model}</strong><br>
+                <small>${p.ram ? p.ram + ' RAM | ' : ''}${p.storage ? p.storage + ' Storage | ' : ''}Price: 
+                <span class="price-tag" onclick="this.innerText === 'XXXX' ? this.innerText = '₹${p.price}' : this.innerText = 'XXXX'">XXXX</span></small><br>
+                ${p.link ? `<a href="${p.link}" target="_blank" style="color:var(--primary); text-decoration:none; font-size:12px; font-weight:bold;">View Online ➔</a>` : ''}
+            `;
+            list.appendChild(item);
+        });
+    }
+
+    // EDIT ITEM
+    function editItem(id) {
+        const p = allProducts.find(item => item.id === id);
+        if(p) {
+            editId = id;
+            
+            // Check if brand exists in dropdown, else set to ADD_NEW
+            const select = document.getElementById('brandSelect');
+            let exists = Array.from(select.options).some(opt => opt.value === p.brand);
+            if(exists) {
+                select.value = p.brand;
+                document.getElementById('newBrandInput').style.display = 'none';
+            } else {
+                select.value = 'ADD_NEW';
+                document.getElementById('newBrandInput').style.display = 'block';
+                document.getElementById('newBrandInput').value = p.brand;
+            }
+
+            document.getElementById('modelName').value = p.model || "";
+            document.getElementById('ram').value = p.ram || "";
+            document.getElementById('storage').value = p.storage || "";
+            document.getElementById('price').value = p.price || "";
+            document.getElementById('fLink').value = p.link || "";
+            document.getElementById('saveBtn').innerText = "UPDATE DETAILS";
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        }
+    }
+
+    // DELETE ITEM
+    function deleteItem(id) {
+        if(confirm("Kya aap ise delete karna chahte hain?")) {
+            allProducts = allProducts.filter(item => item.id !== id);
+            localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(allProducts));
+            applyFilters();
+        }
+    }
+
+    // UPDATED FILTER FUNCTION (Search + RAM + Storage + Min/Max Price)
+    function applyFilters() {
+        const term = document.getElementById('searchInput').value.toLowerCase().trim();
+        const ramTerm = document.getElementById('ramFilter').value.toLowerCase().trim();
+        const storageTerm = document.getElementById('storageFilter').value.toLowerCase().trim();
+        const min = parseInt(document.getElementById('minPrice').value) || 0;
+        const max = parseInt(document.getElementById('maxPrice').value) || 999999;
+        
+        const filtered = allProducts.filter(p => {
+            const matchesSearch = (p.brand || "").toLowerCase().includes(term) || (p.model || "").toLowerCase().includes(term);
+            const matchesRam = (p.ram || "").toLowerCase().includes(ramTerm);
+            const matchesStorage = (p.storage || "").toLowerCase().includes(storageTerm);
+            const matchesPrice = parseInt(p.price) >= min && parseInt(p.price) <= max;
+
+            return matchesSearch && matchesRam && matchesStorage && matchesPrice;
+        });
+        
+        updateList(filtered);
+    }
+
+    // TOGGLE NEW BRAND INPUT
+    function checkBrand(val) {
+        document.getElementById('newBrandInput').style.display = (val === 'ADD_NEW') ? 'block' : 'none';
+    }
+</script>
+</body>
+</html>
